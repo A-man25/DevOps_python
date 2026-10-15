@@ -25,7 +25,9 @@ from pipeline.git_operations import (
     get_changed_files,
     stage_changes,
     commit_build_version,
-    create_build_tag
+    create_build_tag,
+    push_changes,
+    push_build_tag
 )
 
 from pipeline.cop_operations import (
@@ -36,7 +38,7 @@ from pipeline.cop_operations import (
     cop_upload
 )
 
-from ui.input_handler import get_git_changes_confirmation
+from ui.input_handler import get_git_changes_confirmation, get_git_changes_push_confirmation
 
 def run_beta_build(
     repo_path: str,
@@ -153,7 +155,31 @@ def run_beta_build(
         return False
 
     # --------------------------------------------------------
-    # 11. Build extensions
+    # 11. User confirms Git changes
+    # --------------------------------------------------------
+
+    if not get_git_changes_push_confirmation():
+        print("Beta build cancelled. Git push was not approved.")
+        return False
+
+    # --------------------------------------------------------
+    # 12. Commit build version
+    # --------------------------------------------------------
+
+    if not push_changes(repo_path):
+        print("Beta build stopped, unable to push changes.")
+        return False
+
+    # --------------------------------------------------------
+    # 13. Commit build version
+    # --------------------------------------------------------
+
+    if not push_build_tag(build_version, repo_path):
+        print("Beta build stopped, unable to push build tag")
+        return False
+
+    # --------------------------------------------------------
+    # 14. Build extensions
     # --------------------------------------------------------
 
     if not cop_make(
@@ -164,7 +190,7 @@ def run_beta_build(
         return False
 
     # --------------------------------------------------------
-    # 12. Upload Beta build
+    # 15. Upload Beta build
     # --------------------------------------------------------
 
     if not cop_upload(

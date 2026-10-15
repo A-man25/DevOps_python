@@ -116,3 +116,15 @@ def get_git_changes_confirmation() -> bool:
     
     print("Incorrect input.")
     return get_git_changes_confirmation()
+
+def get_git_changes_push_confirmation() -> bool:
+    """Confirms whether the displayed Git changes are safe to push."""
+    user_input = input("\nAre these changes correct and safe to push? [y/n]: ")
+    user_input = user_input.lower().strip()
+    if user_input == "y" or user_input == "yes":
+        return True
+    elif user_input == "n" or user_input == "no":
+        return False
+    
+    print("Incorrect input.")
+    return get_git_changes_push_confirmation()

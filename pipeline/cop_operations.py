@@ -20,11 +20,12 @@
 
 import subprocess
 
-
 def cop_clean(repo_path: str) -> bool:
     """Runs 'cop clean' in the specified build workspace."""
+    print("/n----------Executing COP-CLEAN-------------")
     cop_command = ["cop", "clean"]
-    result = subprocess.run(cop_command, cwd=repo_path, capture_output=True, text=True)
+    print(" ".join(cop_command))
+    result = subprocess.run(cop_command, cwd=repo_path, text=True)
     if result.returncode != 0:
         print("COP clean failed.")
         print(result.stderr)
@@ -36,8 +37,10 @@ def cop_clean(repo_path: str) -> bool:
 
 def cop_repair(repo_path: str) -> bool:
     """Runs 'cop repair' in the specified build workspace."""
+    print("/n-------------Executing COP-REPAIR------------")
     cop_command = ["cop", "repair"]
-    result = subprocess.run(cop_command, cwd=repo_path, capture_output=True, text=True)
+    print(" ".join(cop_command))
+    result = subprocess.run(cop_command, cwd=repo_path, text=True)
     if result.returncode != 0:
         print("COP repair failed.")
         print(result.stderr)
@@ -55,8 +58,11 @@ def cop_set_versions(extension_groups: list[str], build_version: str, repo_path:
     cop setversions [hon] [asi]
     /version=16.5.9.11 /notag /nocommit
     """
+
+    print("/n-------Executing COP SET-VERSION-----------------")
     cop_command = ["cop", "setversions", *extension_groups, f"/version={build_version}", "/notag", "/nocommit"]
-    result = subprocess.run(cop_command, cwd=repo_path, capture_output=True, text=True)
+    print(" ".join(cop_command))
+    result = subprocess.run(cop_command, cwd=repo_path, text=True)
 
     if result.returncode != 0:
         print("COP setversions failed.")
@@ -73,9 +79,11 @@ def cop_set_versions(extension_groups: list[str], build_version: str, repo_path:
 
 def cop_make(extension_groups: list[str], repo_path: str) -> bool:
     """Builds the selected HNI extension groups."""
+    print("/n----------Executing COP-MAKE-----------------")
+    print("Executing COP-make")
     cop_command = ["cop", "make", *extension_groups]
-
-    result = subprocess.run(cop_command, cwd=repo_path, capture_output=True, text=True)
+    print(" ".join(cop_command))
+    result = subprocess.run(cop_command, cwd=repo_path, text=True)
     if result.returncode != 0:
         print("COP build failed.")
         print(result.stderr)
@@ -87,8 +95,9 @@ def cop_make(extension_groups: list[str], repo_path: str) -> bool:
 
 def cop_upload(extension_groups: list[str], upload_name: str, repo_path: str) -> bool:
     """Uploads the selected HNI extension builds."""
+    print("/n-----------Executing COP-UPLOAD---------------")
     cop_command = ["cop", "upload", *extension_groups, f"/uploadname={upload_name}"]
-
+    print(" ".join(cop_command))
     result = subprocess.run(cop_command, cwd=repo_path, capture_output=True, text=True)
 
     if result.returncode != 0:

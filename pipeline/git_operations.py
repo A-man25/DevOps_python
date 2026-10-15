@@ -156,3 +156,27 @@ def get_changed_files(repo_path: str) -> list[str]:
         return []
 
     return result.stdout.splitlines()
+
+def push_changes(repo_path: str) -> bool:
+   """Pushes the current branch commits to the remote repository."""
+   git_command = ["git", "push"]
+   print("\nExecuting command:")
+   print(" ".join(git_command))
+   result = subprocess.run(git_command, cwd=repo_path, text=True)
+   if result.returncode != 0:
+       print("Failed to push branch changes.")
+       return False
+   print("Branch changes pushed successfully.")
+   return True
+
+def push_build_tag(build_version: str, repo_path: str) -> bool:
+   """Pushes the specific build tag to origin."""
+   git_command = ["git", "push", "origin", build_version]
+   print("\nExecuting command:")
+   print(" ".join(git_command))
+   result = subprocess.run(git_command, cwd=repo_path, text=True)
+   if result.returncode != 0:
+       print(f"Failed to push Git tag: {build_version}")
+       return False
+   print(f"Git tag pushed successfully: {build_version}")
+   return True
