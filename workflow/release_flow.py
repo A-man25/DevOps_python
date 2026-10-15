@@ -17,13 +17,20 @@
 
 from ui.input_handler import (
     get_release_branch_input,
-    get_custom_release_branch
+    get_custom_release_branch,
+
+    # Test
+    get_test_branch_input
 )
 
 from pipeline.git_operations import (
     get_release_branches,
     get_latest_release_branch,
-    validate_release_branch
+    validate_release_branch,
+
+    # Test
+    get_Test_branches,
+    validate_test_branch
 )
 
 
@@ -51,3 +58,25 @@ def get_required_release_branch(repo_path: str) -> str | None:
         return validated_branch
 
     return None
+
+
+# Test
+def get_test_branch(repo_path: str) -> str | None:
+    """
+    ONLY FOR TEST <dev_mode>
+    Returns the test branch required for the build.
+    The user selects one of the available origin/test/* branches.
+    """
+    test_branch_list = get_Test_branches(repo_path)
+    if not test_branch_list:
+        print("No test branches found.")
+        return None
+
+    test_branch = get_test_branch_input(test_branch_list)
+    validated_branch = validate_test_branch(test_branch, test_branch_list)
+    if validated_branch is None:
+        print("Test branch does not exist.")
+        return get_test_branch(repo_path)
+
+    return validated_branch
+

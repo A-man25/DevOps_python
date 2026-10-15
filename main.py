@@ -12,9 +12,13 @@
 
 from models.enums import Build_Type
 
+
 from ui.display import (
     begin_msg,
-    show_build_summary
+    show_build_summary,
+
+    # Test
+    show_dev_mode_msg
 )
 
 from ui.input_handler import (
@@ -24,7 +28,10 @@ from ui.input_handler import (
 )
 
 from workflow.release_flow import (
-    get_required_release_branch
+    get_required_release_branch,
+
+    # Test
+    get_test_branch
 )
 
 from workflow.beta_build_flow import (
@@ -33,7 +40,10 @@ from workflow.beta_build_flow import (
 
 from pipeline.git_operations import (
     get_version_string_from_branch,
-    get_git_tags
+    get_git_tags,
+
+    # Test
+    get_test_version_string_from_branch
 )
 
 from pipeline.versioning import (
@@ -47,19 +57,43 @@ from config.extension_config import (
     get_cop_extension_groups
 )
 
+# Test
+from config.dev_config import (
+    dev_mode
+)
 
 def main():
     begin_msg()
+
+    # Test
+    if dev_mode:
+        show_dev_mode_msg()
+
     repo_path = r"C:\CetDev\version16.5\extensions\custom"
     build_type = get_build_type()
     extension_list = get_extension_list()
-    release_branch = get_required_release_branch(repo_path)
+
+    # Test
+    release_branch = " "
+
+    if not dev_mode:
+        release_branch = get_required_release_branch(repo_path)
+    else:
+        release_branch = get_test_branch(repo_path)
 
     if release_branch is None:
         print("Could not determine release branch.")
         return
 
-    release_version = get_version_string_from_branch(release_branch)
+    # Test
+    if not dev_mode:
+        release_version = get_version_string_from_branch(release_branch)
+    else:
+        release_version = get_test_version_string_from_branch(release_branch)
+        if not release_version:
+            print("Could not determine version from test branch.")
+            return
+
     git_tags = get_git_tags(repo_path)
     release_tags = get_release_build_tags(git_tags, release_version)
     latest_build_number = get_latest_build_number(release_tags)

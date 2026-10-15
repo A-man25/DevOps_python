@@ -77,21 +77,38 @@ def cop_set_versions(extension_groups: list[str], build_version: str, repo_path:
     return True
 
 
+import subprocess
+
+
 def cop_make(extension_groups: list[str], repo_path: str) -> bool:
-    """Builds the selected HNI extension groups."""
-    print("/n----------Executing COP-MAKE-----------------")
-    print("Executing COP-make")
+
     cop_command = ["cop", "make", *extension_groups]
+
+    print("\nExecuting:")
     print(" ".join(cop_command))
-    result = subprocess.run(cop_command, cwd=repo_path, text=True)
-    if result.returncode != 0:
-        print("COP build failed.")
-        print(result.stderr)
+    print()
+
+    process = subprocess.Popen(cop_command, cwd=repo_path, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+    progress_active = False
+
+    for line in process.stdout:
+        line = line.strip()
+        if "Work in progress" in line:
+            print(f"\r{line:<100}", end="", flush=True)
+            progress_active = True
+        else:
+            if progress_active:
+                print()
+                progress_active = False
+            print(line)
+    process.wait()
+
+    if process.returncode != 0:
+        print("\nCOP build failed.")
         return False
 
-    print("COP build completed successfully.")
+    print("\nCOP build completed successfully.")
     return True
-
 
 def cop_upload(extension_groups: list[str], upload_name: str, repo_path: str) -> bool:
     """Uploads the selected HNI extension builds."""

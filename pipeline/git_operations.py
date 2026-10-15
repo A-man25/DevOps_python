@@ -180,3 +180,48 @@ def push_build_tag(build_version: str, repo_path: str) -> bool:
        return False
    print(f"Git tag pushed successfully: {build_version}")
    return True
+
+# Test
+def get_Test_branches(repo_path:str) ->list[str]:
+    """Returns all remote test branches from the repository."""
+    git_command_list = ["git", "branch", "-r", "--list", "origin/test/*"]
+    result = subprocess.run(git_command_list, cwd=repo_path, capture_output=True, text=True)
+    if result.returncode != 0:
+        print("Failed to return branches")
+        print(result.stderr)
+        return []
+    
+    branches = result.stdout.splitlines()
+    return branches
+
+
+# Test
+def validate_test_branch(branch: str, test_branch_list: list[str]) -> str | None:
+    branch = branch.strip().lower()
+    if branch.startswith("origin/test/"):
+        required_branch = branch
+    elif branch.startswith("test/"):
+        required_branch = "origin/" + branch
+    else:
+        required_branch = "origin/test/" + branch
+
+    # Return the branch name as it exists on remote (keeps original case)
+    for this_branch in test_branch_list:
+        this_branch = this_branch.strip()
+        if this_branch.lower() == required_branch:
+            return this_branch
+
+    return None
+
+# Test
+def get_test_version_string_from_branch(branch: str) -> str:
+    """Extracts the numeric version string from a test branch name.
+    Example: origin/test/demo.build.17.5.0 -> 17.5.0
+    """
+    branch_name = get_version_string_from_branch(branch)
+    version_str_list = []
+    for val in branch_name.split("."):
+        if val.isdigit():
+            version_str_list.append(val)
+
+    return ".".join(version_str_list)

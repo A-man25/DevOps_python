@@ -59,3 +59,15 @@ def show_build_summary(build_type,extension_list,release_branch: str,release_ver
     print("Next Version    :", next_build_version)
 
     print("======================================================")
+
+
+# Test
+def show_dev_mode_msg():
+    print("          DEV MODE : USING TEST BRANCHES              ")
+    print("======================================================")
+
+# Test
+def ask_Test_branch_info_msg(test_branch_list: list[str]):
+    print("\nAvailable test branches:")
+    for this_branch in test_branch_list:
+        print(this_branch.strip())

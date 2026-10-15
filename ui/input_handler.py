@@ -10,7 +10,10 @@
 from .display import (
     ask_build_type_msg,
     ask_extension_list_msg,
-    ask_branch_info_msg
+    ask_branch_info_msg,
+
+    # Test
+    ask_Test_branch_info_msg
     )
 
 from models.enums import (
@@ -128,3 +131,12 @@ def get_git_changes_push_confirmation() -> bool:
     
     print("Incorrect input.")
     return get_git_changes_push_confirmation()
+
+# Test
+def get_test_branch_input(test_branch_list: list[str]) ->str:
+    """Shows the available test branches and asks for one.
+    Accepts origin/test/<name>, test/<name> or <name>.
+    """
+    ask_Test_branch_info_msg(test_branch_list)
+    user_input = input("\nEnter test branch: ")
+    return user_input
