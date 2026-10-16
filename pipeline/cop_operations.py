@@ -15,14 +15,22 @@
 # - Build selected HNI extensions
 # - Upload successful builds
 # - Report COP command success or failure
+# - Show COP make output live and cleanly
 #
 # ============================================================
 
 import subprocess
+import time
+
+from ui.display import (
+    show_cop_make_header,
+    show_cop_make_summary,
+    show_cop_make_errors_msg
+)
 
 def cop_clean(repo_path: str) -> bool:
     """Runs 'cop clean' in the specified build workspace."""
-    print("/n----------Executing COP-CLEAN-------------")
+    print("\n----------Executing COP-CLEAN-------------")
     cop_command = ["cop", "clean"]
     print(" ".join(cop_command))
     result = subprocess.run(cop_command, cwd=repo_path, text=True)
@@ -37,7 +45,7 @@ def cop_clean(repo_path: str) -> bool:
 
 def cop_repair(repo_path: str) -> bool:
     """Runs 'cop repair' in the specified build workspace."""
-    print("/n-------------Executing COP-REPAIR------------")
+    print("\n-------------Executing COP-REPAIR------------")
     cop_command = ["cop", "repair"]
     print(" ".join(cop_command))
     result = subprocess.run(cop_command, cwd=repo_path, text=True)
@@ -59,7 +67,7 @@ def cop_set_versions(extension_groups: list[str], build_version: str, repo_path:
     /version=16.5.9.11 /notag /nocommit
     """
 
-    print("/n-------Executing COP SET-VERSION-----------------")
+    print("\n-------Executing COP SET-VERSION-----------------")
     cop_command = ["cop", "setversions", *extension_groups, f"/version={build_version}", "/notag", "/nocommit"]
     print(" ".join(cop_command))
     result = subprocess.run(cop_command, cwd=repo_path, text=True)
@@ -77,42 +85,36 @@ def cop_set_versions(extension_groups: list[str], build_version: str, repo_path:
     return True
 
 
-import subprocess
-
-
 def cop_make(extension_groups: list[str], repo_path: str) -> bool:
+    """
+    Builds the selected HNI extension groups.
 
+    COP writes straight to the console, the same as running it
+    from a .bat file, so its live status redraws cleanly in place.
+    Do not capture this output (stdout=PIPE): COP needs the real
+    console to redraw its status lines.
+    """
     cop_command = ["cop", "make", *extension_groups]
+    show_cop_make_header(cop_command)
 
-    print("\nExecuting:")
-    print(" ".join(cop_command))
-    print()
+    start_time = time.monotonic()
+    result = subprocess.run(cop_command, cwd=repo_path)
+    build_success = result.returncode == 0
+    show_cop_make_summary(time.monotonic() - start_time, build_success)
 
-    process = subprocess.Popen(cop_command, cwd=repo_path, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
-    progress_active = False
-
-    for line in process.stdout:
-        line = line.strip()
-        if "Work in progress" in line:
-            print(f"\r{line:<100}", end="", flush=True)
-            progress_active = True
-        else:
-            if progress_active:
-                print()
-                progress_active = False
-            print(line)
-    process.wait()
-
-    if process.returncode != 0:
-        print("\nCOP build failed.")
+    if not build_success:
+        # Shows only the targets that failed, with a few errors each
+        show_cop_make_errors_msg()
+        subprocess.run(["cop", "make", *extension_groups, "/printLastErrorsCompact"], cwd=repo_path)
+        print("COP build failed.")
         return False
 
-    print("\nCOP build completed successfully.")
+    print("COP build completed successfully.")
     return True
 
 def cop_upload(extension_groups: list[str], upload_name: str, repo_path: str) -> bool:
     """Uploads the selected HNI extension builds."""
-    print("/n-----------Executing COP-UPLOAD---------------")
+    print("\n-----------Executing COP-UPLOAD---------------")
     cop_command = ["cop", "upload", *extension_groups, f"/uploadname={upload_name}"]
     print(" ".join(cop_command))
     result = subprocess.run(cop_command, cwd=repo_path, capture_output=True, text=True)

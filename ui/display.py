@@ -14,6 +14,7 @@
 # - Display release/build information
 # - Display build summary before execution
 # - Display user-facing status messages
+# - Display live COP make output
 #
 # ============================================================
 
@@ -59,6 +60,33 @@ def show_build_summary(build_type,extension_list,release_branch: str,release_ver
     print("Next Version    :", next_build_version)
 
     print("======================================================")
+
+
+def format_elapsed_time(elapsed_seconds: float) -> str:
+    """Converts seconds into HH:MM:SS."""
+    elapsed_seconds = int(elapsed_seconds)
+    hours = elapsed_seconds // 3600
+    minutes = elapsed_seconds % 3600 // 60
+    seconds = elapsed_seconds % 60
+    return f"{hours:02}:{minutes:02}:{seconds:02}"
+
+def show_cop_make_header(cop_command: list[str]):
+    print("\n======================================================")
+    print("                       COP MAKE                       ")
+    print("======================================================")
+    print("Command         :", " ".join(cop_command))
+    print("------------------------------------------------------\n")
+
+def show_cop_make_summary(elapsed_seconds: float, build_success: bool):
+    print("\n======================================================")
+    print("                   COP MAKE RESULT                    ")
+    print("======================================================")
+    print("Status          :", "SUCCESS" if build_success else "FAILED")
+    print("Time Taken      :", format_elapsed_time(elapsed_seconds))
+    print("======================================================")
+
+def show_cop_make_errors_msg():
+    print("\nTargets with errors:")
 
 
 # Test
