@@ -12,10 +12,15 @@
 
 from models.enums import Build_Type
 
+from ui.colours import (
+    enable_console_colours
+)
 
 from ui.display import (
     begin_msg,
     show_build_summary,
+    show_error_msg,
+    show_warning_msg,
 
     # Test
     show_dev_mode_msg
@@ -63,6 +68,7 @@ from config.dev_config import (
 )
 
 def main():
+    enable_console_colours()
     begin_msg()
 
     # Test
@@ -82,7 +88,7 @@ def main():
         release_branch = get_test_branch(repo_path)
 
     if release_branch is None:
-        print("Could not determine release branch.")
+        show_error_msg("Could not determine release branch.")
         return
 
     # Test
@@ -91,7 +97,7 @@ def main():
     else:
         release_version = get_test_version_string_from_branch(release_branch)
         if not release_version:
-            print("Could not determine version from test branch.")
+            show_error_msg("Could not determine version from test branch.")
             return
 
     git_tags = get_git_tags(repo_path)
@@ -104,18 +110,18 @@ def main():
     show_build_summary(build_type, extension_list, release_branch, release_version, next_build_version)
 
     if not get_build_confirmation():
-        print("\nBuild cancelled.")
+        show_warning_msg("Build cancelled.")
         return
     if build_type == Build_Type.BETA:
+        # run_beta_build shows its own success / stopped banner
         build_success = run_beta_build(repo_path, release_branch, cop_extension_groups, next_build_version, upload_name)
         if not build_success:
-            print("\nBeta build failed.")
             return
     elif build_type == Build_Type.FIRST_AID:
-        print("First Aid build is not implemented yet.")
+        show_warning_msg("First Aid build is not implemented yet.")
         return
     elif build_type == Build_Type.PROJECT_BASED:
-        print("Project Based build is not implemented yet.")
+        show_warning_msg("Project Based build is not implemented yet.")
         return
 
 if __name__ == "__main__":

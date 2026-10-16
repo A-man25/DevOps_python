@@ -7,13 +7,12 @@
 # Created      : 14-Oct-2026
 # ============================================================
 
-import getpass
-
 from .display import (
     ask_build_type_msg,
     ask_extension_list_msg,
     ask_branch_info_msg,
-    ask_myconfigura_login_msg,
+    prompt_text,
+    show_input_error_msg,
 
     # Test
     ask_Test_branch_info_msg
@@ -26,10 +25,10 @@ from models.enums import (
 
 def get_build_type()->Build_Type:
     ask_build_type_msg()
-    user_input = input("\nEnter choice: :) ")
+    user_input = input(prompt_text("Enter choice: :) "))
     build_type = get_build_type_enum(user_input)
     if(build_type == Build_Type.NONE):
-        print("incorrect input")
+        show_input_error_msg("Incorrect input.")
         return get_build_type()
 
     return build_type
@@ -49,11 +48,11 @@ def get_build_type_enum(input_str: str)->Build_Type:
 
 def get_extension_list()->list[Extension]:
     ask_extension_list_msg()
-    user_input = input("\nEnter your choices: :) ")
+    user_input = input(prompt_text("Enter your choices: :) "))
     input_list = user_input.split(",")
     extension_list = get_extension_enum(input_list)
     if Extension.NONE in extension_list:
-        print("Incorrect extension entered.")
+        show_input_error_msg("Incorrect extension entered.")
         return get_extension_list()
 
     return extension_list
@@ -74,7 +73,7 @@ def get_extension_enum(input_list: list[str]) -> list[Extension]:
             extension = Extension.HNI_CORE
         else:
             extension = Extension.NONE
- 
+
         if extension not in extension_list:
             extension_list.append(extension)
 
@@ -85,68 +84,55 @@ def get_release_branch_input() ->str:
     Otherwise, use the latest available release branch.
     """
     ask_branch_info_msg()
-    input_str = input("\nEnter your choice [l/c]: ")
+    input_str = input(prompt_text("Enter your choice [l/c]: "))
     input_str = input_str.lower().strip()
     if input_str == "l":
         return "l"
     elif input_str == "c":
         return "c"
-    
-    print("Incorrect input.")
+
+    show_input_error_msg("Incorrect input.")
 
     return get_release_branch_input()
 
 
 def get_custom_release_branch()->str:
-    user_input = input("Enter release branch: ")
+    user_input = input(prompt_text("Enter release branch: "))
     return user_input
 
 def get_build_confirmation() -> bool:
-    user_input = input("\nProceed with build? [y/n]: ")
+    user_input = input(prompt_text("Proceed with build? [y/n]: "))
     user_input = user_input.lower().strip()
     if user_input == "y" or user_input == "yes":
         return True
     elif user_input == "n" or user_input == "no":
         return False
-    print("Incorrect input.")
+    show_input_error_msg("Incorrect input.")
     return get_build_confirmation()
 
 def get_git_changes_confirmation() -> bool:
     """Confirms whether the displayed Git changes are safe to commit."""
-    user_input = input("\nAre these changes correct and safe to commit? [y/n]: ")
+    user_input = input(prompt_text("Are these changes correct and safe to commit? [y/n]: "))
     user_input = user_input.lower().strip()
     if user_input == "y" or user_input == "yes":
         return True
     elif user_input == "n" or user_input == "no":
         return False
-    
-    print("Incorrect input.")
+
+    show_input_error_msg("Incorrect input.")
     return get_git_changes_confirmation()
 
 def get_git_changes_push_confirmation() -> bool:
     """Confirms whether the displayed Git changes are safe to push."""
-    user_input = input("\nAre these changes correct and safe to push? [y/n]: ")
+    user_input = input(prompt_text("Are these changes correct and safe to push? [y/n]: "))
     user_input = user_input.lower().strip()
     if user_input == "y" or user_input == "yes":
         return True
     elif user_input == "n" or user_input == "no":
         return False
-    
-    print("Incorrect input.")
+
+    show_input_error_msg("Incorrect input.")
     return get_git_changes_push_confirmation()
-
-def get_myconfigura_login() -> tuple[str, str]:
-    """Asks for the MyConfigura email and password.
-    The password is hidden while typing.
-    """
-    ask_myconfigura_login_msg()
-    email = input("Email    : ").strip()
-    password = getpass.getpass("Password : ")
-    if not email or not password:
-        print("Email and password are required.")
-        return get_myconfigura_login()
-
-    return email, password
 
 # Test
 def get_test_branch_input(test_branch_list: list[str]) ->str:
@@ -154,5 +140,5 @@ def get_test_branch_input(test_branch_list: list[str]) ->str:
     Accepts origin/test/<name>, test/<name> or <name>.
     """
     ask_Test_branch_info_msg(test_branch_list)
-    user_input = input("\nEnter test branch: ")
+    user_input = input(prompt_text("Enter test branch: "))
     return user_input

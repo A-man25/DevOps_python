@@ -13,9 +13,15 @@
 # - Extract release version information from branch names
 # - Convert version strings into comparable numeric tuples
 # - Determine the latest available release branch
+# - Checkout, pull, commit, tag and push the build version
+#
+# Checkout, pull, add, commit, tag and push run through
+# run_command_live, which shows one live progress line.
 # ============================================================
 
 import subprocess
+
+from pipeline.command_runner import run_command_live
 
 def get_release_branches(repo_path:str) ->list[str]:
     git_command_list = ["git", "branch", "-r", "--list", "origin/release/*"]
@@ -90,61 +96,27 @@ def checkout_release_branch(release_branch: str, repo_path: str) -> bool:
         release_branch = release_branch.removeprefix("origin/")
         
     git_command = ["git", "checkout", release_branch]
-    result = subprocess.run(git_command, cwd=repo_path, capture_output=True, text=True)
-    if result.returncode != 0:
-        print("Failed to checkout release branch.")
-        print(result.stderr)
-        return False
-
-    print(f"Successfully checked out: {release_branch}")
-
-    return True
+    return run_command_live(git_command, repo_path, "GIT CHECKOUT", release_branch)
 
 def pull_latest_changes(repo_path: str) -> bool:
-    git_command = ["git", "pull"]
-    result = subprocess.run(git_command, cwd=repo_path, capture_output=True, text=True)
-    if result.returncode != 0:
-        print("Failed to pull latest changes.")
-        print(result.stderr)
-        return False
-    print("Successfully pulled latest changes.")
-    return True
+    # --progress makes Git report progress even though its output is read by Python
+    git_command = ["git", "pull", "--progress"]
+    return run_command_live(git_command, repo_path, "GIT PULL")
 
 def stage_changes(repo_path: str) -> bool:
     """Stages repository changes for the build version commit."""
     git_command = ["git", "add", "."]
-    result = subprocess.run(git_command, cwd=repo_path, capture_output=True, text=True)
-    if result.returncode != 0:
-        print("Failed to stage Git changes.")
-        print(result.stderr)
-        return False
-
-    print("Git changes staged successfully.")
-    return True
+    return run_command_live(git_command, repo_path, "GIT ADD")
 
 def commit_build_version(build_version: str, repo_path: str) -> bool:
     """Creates the Git commit for the new build version."""
     git_command = ["git", "commit", "-m", build_version]
-    result = subprocess.run(git_command, cwd=repo_path, capture_output=True, text=True)
-    if result.returncode != 0:
-        print("Failed to commit build version.")
-        print(result.stderr)
-        return False
-
-    print(f"Git commit created: {build_version}")
-    return True
+    return run_command_live(git_command, repo_path, "GIT COMMIT", build_version)
 
 def create_build_tag(build_version: str, repo_path: str) -> bool:
     """Creates a Git tag for the build version."""
     git_command = ["git", "tag", build_version]
-    result = subprocess.run(git_command, cwd=repo_path, capture_output=True, text=True)
-    if result.returncode != 0:
-        print("Failed to create Git tag.")
-        print(result.stderr)
-        return False
-
-    print(f"Git tag created: {build_version}")
-    return True
+    return run_command_live(git_command, repo_path, "GIT TAG", build_version)
 
 def get_changed_files(repo_path: str) -> list[str]:
     """Returns files currently modified in the Git working tree."""
@@ -158,28 +130,14 @@ def get_changed_files(repo_path: str) -> list[str]:
     return result.stdout.splitlines()
 
 def push_changes(repo_path: str) -> bool:
-   """Pushes the current branch commits to the remote repository."""
-   git_command = ["git", "push"]
-   print("\nExecuting command:")
-   print(" ".join(git_command))
-   result = subprocess.run(git_command, cwd=repo_path, text=True)
-   if result.returncode != 0:
-       print("Failed to push branch changes.")
-       return False
-   print("Branch changes pushed successfully.")
-   return True
+    """Pushes the current branch commits to the remote repository."""
+    git_command = ["git", "push", "--progress"]
+    return run_command_live(git_command, repo_path, "GIT PUSH")
 
 def push_build_tag(build_version: str, repo_path: str) -> bool:
-   """Pushes the specific build tag to origin."""
-   git_command = ["git", "push", "origin", build_version]
-   print("\nExecuting command:")
-   print(" ".join(git_command))
-   result = subprocess.run(git_command, cwd=repo_path, text=True)
-   if result.returncode != 0:
-       print(f"Failed to push Git tag: {build_version}")
-       return False
-   print(f"Git tag pushed successfully: {build_version}")
-   return True
+    """Pushes the specific build tag to origin."""
+    git_command = ["git", "push", "--progress", "origin", build_version]
+    return run_command_live(git_command, repo_path, "GIT PUSH TAG", build_version)
 
 # Test
 def get_Test_branches(repo_path:str) ->list[str]:
