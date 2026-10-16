@@ -7,10 +7,13 @@
 # Created      : 14-Oct-2026
 # ============================================================
 
+import getpass
+
 from .display import (
     ask_build_type_msg,
     ask_extension_list_msg,
     ask_branch_info_msg,
+    ask_myconfigura_login_msg,
 
     # Test
     ask_Test_branch_info_msg
@@ -131,6 +134,19 @@ def get_git_changes_push_confirmation() -> bool:
     
     print("Incorrect input.")
     return get_git_changes_push_confirmation()
+
+def get_myconfigura_login() -> tuple[str, str]:
+    """Asks for the MyConfigura email and password.
+    The password is hidden while typing.
+    """
+    ask_myconfigura_login_msg()
+    email = input("Email    : ").strip()
+    password = getpass.getpass("Password : ")
+    if not email or not password:
+        print("Email and password are required.")
+        return get_myconfigura_login()
+
+    return email, password
 
 # Test
 def get_test_branch_input(test_branch_list: list[str]) ->str:

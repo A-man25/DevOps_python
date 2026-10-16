@@ -31,6 +31,9 @@ from pipeline.git_operations import (
 )
 
 from pipeline.cop_operations import (
+    is_cop_login_set,
+    set_cop_login,
+    cop_login,
     cop_clean,
     cop_repair,
     cop_set_versions,
@@ -38,7 +41,20 @@ from pipeline.cop_operations import (
     cop_upload
 )
 
-from ui.input_handler import get_git_changes_confirmation, get_git_changes_push_confirmation
+from ui.input_handler import get_git_changes_confirmation, get_git_changes_push_confirmation, get_myconfigura_login
+
+def login_to_myconfigura(repo_path: str) -> bool:
+    """
+    Asks for the MyConfigura login once and passes it to COP,
+    so COP commands don't keep asking for it during the build.
+    Not asked if CETDEV_MC_USERNAME / CETDEV_MC_PASSWORD are
+    already set in Windows.
+    """
+    if not is_cop_login_set():
+        email, password = get_myconfigura_login()
+        set_cop_login(email, password)
+
+    return cop_login(repo_path)
 
 def run_beta_build(
     repo_path: str,
@@ -53,6 +69,14 @@ def run_beta_build(
     Returns True if the complete build succeeds.
     Returns False if any pipeline stage fails or is cancelled.
     """
+
+    # --------------------------------------------------------
+    # 0. Log in to MyConfigura (asked once for all COP commands)
+    # --------------------------------------------------------
+
+    if not login_to_myconfigura(repo_path):
+        print("Beta build stopped during MyConfigura login.")
+        return False
 
     # --------------------------------------------------------
     # 1. Checkout release branch

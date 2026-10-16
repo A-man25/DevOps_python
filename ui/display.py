@@ -43,6 +43,9 @@ def ask_branch_info_msg():
     print("Latest [l]")
     print("Custom [c]")
 
+def ask_myconfigura_login_msg():
+    print("\nMyConfigura login (asked once, used for all COP commands):")
+
 def show_build_summary(build_type,extension_list,release_branch: str,release_version: str,next_build_version: str):
     print("\n======================================================")
     print("                    BUILD SUMMARY                     ")

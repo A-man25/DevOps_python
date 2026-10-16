@@ -16,9 +16,11 @@
 # - Upload successful builds
 # - Report COP command success or failure
 # - Show COP make output live and cleanly
+# - Pass the MyConfigura login to COP
 #
 # ============================================================
 
+import os
 import subprocess
 import time
 
@@ -27,6 +29,32 @@ from ui.display import (
     show_cop_make_summary,
     show_cop_make_errors_msg
 )
+
+def is_cop_login_set() -> bool:
+    """Checks if the MyConfigura login is already set for COP."""
+    return bool(os.environ.get("CETDEV_MC_USERNAME")) and bool(os.environ.get("CETDEV_MC_PASSWORD"))
+
+def set_cop_login(email: str, password: str):
+    """
+    Gives COP the MyConfigura login through environment variables,
+    so COP commands don't keep asking for it.
+    Only set for this run, nothing is saved to disk.
+    """
+    os.environ["CETDEV_MC_USERNAME"] = email
+    os.environ["CETDEV_MC_PASSWORD"] = password
+
+def cop_login(repo_path: str) -> bool:
+    """Logs in to MyConfigura using the login set by set_cop_login."""
+    print("\n-----------Executing COP-LOGIN----------------")
+    cop_command = ["cop", "login"]
+    print(" ".join(cop_command))
+    result = subprocess.run(cop_command, cwd=repo_path, text=True)
+    if result.returncode != 0:
+        print("COP login failed. Check your MyConfigura email and password.")
+        return False
+
+    print("COP login completed successfully.")
+    return True
 
 def cop_clean(repo_path: str) -> bool:
     """Runs 'cop clean' in the specified build workspace."""
