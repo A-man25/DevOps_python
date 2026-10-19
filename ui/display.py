@@ -89,6 +89,9 @@ def ask_branch_info_msg():
     show_menu_option("l", "Latest")
     show_menu_option("c", "Custom")
 
+def ask_myconfigura_login_msg():
+    print(f"    {DIM}COP needs this to upload. Asked once per build, never saved.{RESET}")
+
 def show_build_summary(build_type,extension_list,release_branch: str,release_version: str,next_build_version: str):
     show_section("BUILD SUMMARY")
     show_value("Build Type", build_type.name)

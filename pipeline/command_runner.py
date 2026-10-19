@@ -31,6 +31,8 @@ from ui.progress import (
     can_animate,
     show_command,
     show_progress,
+    show_waiting_prompt,
+    end_waiting_prompt,
     show_error_header,
     show_error_line,
     show_target_result,
@@ -63,7 +65,13 @@ FAILURE_TEXT_LIST = [
     "No files to upload",
     "Upload finished with errors",
     "Upload completed with errors",
-    "Error: not all files were successfully uploaded"
+    "Error: not all files were successfully uploaded",
+    "Failed to log in to MyConfigura",
+    "Authentication failed",
+    "OAuth auth failed",
+    "OAuth login failed",
+    "Missing credentials",
+    "Error: Email and password are required"
 ]
 
 # COP make summary, example:
@@ -75,15 +83,22 @@ FAILED_COUNT_PATTERN = re.compile(r"(\d+) failed")
 LOGIN_NEEDED_TEXT = "Login via console is not available"
 LOGIN_HINT = "COP needs a MyConfigura login. Run 'cop login' once in a normal terminal, then start the build again."
 
+# A question waiting for an answer on the same line, example: "Password: " or "Continue? [y/n]"
+PROMPT_PATTERN = re.compile(r"([:?]|\[y/n\]|press any key.*)\s*$", re.IGNORECASE)
+PROMPT_WAIT_SECONDS = 1
+
 FRAME_SECONDS = 0.1
 RECENT_LINE_COUNT = 15
 MAX_ERROR_LINES = 40
 
-def read_output(process: subprocess.Popen, output_queue: queue.Queue):
+def read_output(process: subprocess.Popen, output_queue: queue.Queue, waiting_text: dict):
     """
     Reads command output and passes it to the main thread line by line.
     COP and Git end some lines with \\r instead of \\n when they
     redraw them, so both are treated as the end of a line.
+
+    Text without a line end yet is kept in waiting_text["text"].
+    It can be a question, e.g. "Password: ", that waits for an answer.
     """
     decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
     partial_line = ""
@@ -97,10 +112,12 @@ def read_output(process: subprocess.Popen, output_queue: queue.Queue):
         for line in lines:
             output_queue.put(line)
 
+        waiting_text["text"] = partial_line
+
     if partial_line:
         output_queue.put(partial_line)
 
-def run_command_live(command: list[str], cwd: str, title: str, detail: str = "") -> bool:
+def run_command_live(command: list[str], cwd: str, title: str, detail: str = "", required_text: str = "") -> bool:
     """
     Runs a COP or Git command and shows one animated progress
     line instead of its raw output.
@@ -111,6 +128,9 @@ def run_command_live(command: list[str], cwd: str, title: str, detail: str = "")
     - The full output is saved to the log folder
 
     detail is shown next to [ OK ] when the command succeeds.
+    required_text: if given, the command only counts as a success
+    when it prints this text (for commands whose exit code cannot
+    be trusted, like cop login).
     Returns True if the command succeeds.
     """
     show_command(command)
@@ -123,7 +143,8 @@ def run_command_live(command: list[str], cwd: str, title: str, detail: str = "")
     # Output is read on a separate thread so the animation
     # keeps moving while the command is quiet
     output_queue = queue.Queue()
-    reader_thread = threading.Thread(target=read_output, args=(process, output_queue), daemon=True)
+    waiting_text = {"text": ""}
+    reader_thread = threading.Thread(target=read_output, args=(process, output_queue, waiting_text), daemon=True)
     reader_thread.start()
 
     animate = can_animate()
@@ -141,9 +162,13 @@ def run_command_live(command: list[str], cwd: str, title: str, detail: str = "")
     recent_lines = deque(maxlen=RECENT_LINE_COUNT)
     in_error_section = False
     error_line_count = 0
-    login_needed = False
+    login_needed = True
+    prompt_shown = False
+    required_text_seen = not required_text
 
-    with open(output_log_path, "a", encoding="utf-8") as output_log:
+    # buffering=1 writes every line straight away, so the log is
+    # complete even if a command hangs and the window is closed
+    with open(output_log_path, "a", encoding="utf-8", buffering=1) as output_log:
         output_log.write(f"\n===== {datetime.now():%H:%M:%S}  {' '.join(command)} =====\n")
 
         while True:
@@ -152,6 +177,11 @@ def run_command_live(command: list[str], cwd: str, title: str, detail: str = "")
                 line = output_queue.get()
                 last_output_time = time.monotonic()
                 output_log.write(line + "\n")
+
+                # The question was answered: carry on below it
+                if prompt_shown:
+                    end_waiting_prompt()
+                    prompt_shown = False
 
                 line = ANSI_CODE_PATTERN.sub("", line).strip()
                 if not line:
@@ -182,6 +212,9 @@ def run_command_live(command: list[str], cwd: str, title: str, detail: str = "")
 
                 recent_lines.append(line)
                 result_match = RESULT_PATTERN.match(line)
+
+                if required_text and required_text in line:
+                    required_text_seen = True
 
                 if LOGIN_NEEDED_TEXT in line:
                     login_needed = True
@@ -227,7 +260,17 @@ def run_command_live(command: list[str], cwd: str, title: str, detail: str = "")
             if process.poll() is not None and time.monotonic() - last_output_time >= 1:
                 break
 
-            if animate:
+            # The command is waiting for an answer (e.g. "Password: ").
+            # Stop the animation and show the question, so it can be answered.
+            question = waiting_text["text"].strip()
+            quiet_seconds = time.monotonic() - last_output_time
+            if (not prompt_shown and question and quiet_seconds >= PROMPT_WAIT_SECONDS
+                    and PROMPT_PATTERN.search(question)):
+                output_log.write(question + "  <- waiting for an answer\n")
+                show_waiting_prompt(title, question)
+                prompt_shown = True
+
+            if animate and not prompt_shown:
                 show_progress(title, time.monotonic() - start_time, percent, status, frame)
 
             frame += 1
@@ -237,7 +280,8 @@ def run_command_live(command: list[str], cwd: str, title: str, detail: str = "")
 
     failed_match = FAILED_COUNT_PATTERN.search(summary)
     has_failed_items = failed_match is not None and int(failed_match.group(1)) > 0
-    success = process.returncode == 0 and not has_failed_items and not failed_targets and not failure_text
+    success = (process.returncode == 0 and not has_failed_items and not failed_targets
+               and not failure_text and required_text_seen)
 
     # COP make: only the counts, e.g. "36 item(s), 36 succeeded, ..."
     counts_match = SUMMARY_COUNTS_PATTERN.search(summary)
@@ -245,6 +289,8 @@ def run_command_live(command: list[str], cwd: str, title: str, detail: str = "")
         detail = counts_match.group()
     elif failure_text:
         detail = failure_text
+    elif not required_text_seen:
+        detail = f"did not get \"{required_text}\""
     elif not success:
         detail = f"exit code {process.returncode}"
 

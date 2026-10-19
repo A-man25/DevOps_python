@@ -33,6 +33,10 @@ from pipeline.git_operations import (
 )
 
 from pipeline.cop_operations import (
+    is_cop_login_set,
+    set_cop_login,
+    clear_cop_login,
+    cop_login,
     cop_clean,
     cop_repair,
     cop_set_versions,
@@ -40,7 +44,12 @@ from pipeline.cop_operations import (
     cop_upload
 )
 
-from ui.input_handler import get_git_changes_confirmation, get_git_changes_push_confirmation
+from ui.input_handler import (
+    get_git_changes_confirmation,
+    get_git_changes_push_confirmation,
+    get_myconfigura_login,
+    get_login_retry_confirmation
+)
 
 from ui.display import (
     show_step,
@@ -50,6 +59,30 @@ from ui.display import (
 )
 
 BETA_BUILD_STEPS = 15
+
+def login_to_myconfigura(repo_path: str) -> bool:
+    """
+    Asks for the MyConfigura login once and passes it to COP.
+    There is no saved login on this PC, so without it cop upload
+    waits for a login it cannot ask for.
+    Not asked if CETDEV_MC_USERNAME / CETDEV_MC_PASSWORD are
+    already set in Windows.
+    If the login fails, it offers to try again with another
+    email and password.
+    """
+    if not is_cop_login_set():
+        email, password = get_myconfigura_login()
+        set_cop_login(email, password)
+
+    if cop_login(repo_path):
+        return True
+
+    # Wrong email or password: forget it, so the next try asks again
+    clear_cop_login()
+    if get_login_retry_confirmation():
+        return login_to_myconfigura(repo_path)
+
+    return False
 
 def run_beta_build(
     repo_path: str,
@@ -65,6 +98,15 @@ def run_beta_build(
     Returns False if any pipeline stage fails or is cancelled.
     """
     start_time = time.monotonic()
+
+    # --------------------------------------------------------
+    # 0. Log in to MyConfigura (asked once, used by cop upload)
+    # --------------------------------------------------------
+
+    show_step(0, BETA_BUILD_STEPS, "Log in to MyConfigura")
+    if not login_to_myconfigura(repo_path):
+        show_build_stopped("Stopped during MyConfigura login.")
+        return False
 
     # --------------------------------------------------------
     # 1. Checkout release branch

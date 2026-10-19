@@ -7,10 +7,13 @@
 # Created      : 14-Oct-2026
 # ============================================================
 
+import getpass
+
 from .display import (
     ask_build_type_msg,
     ask_extension_list_msg,
     ask_branch_info_msg,
+    ask_myconfigura_login_msg,
     prompt_text,
     show_input_error_msg,
 
@@ -133,6 +136,32 @@ def get_git_changes_push_confirmation() -> bool:
 
     show_input_error_msg("Incorrect input.")
     return get_git_changes_push_confirmation()
+
+def get_myconfigura_login() -> tuple[str, str]:
+    """Asks for the MyConfigura email and password.
+    The password is hidden while typing.
+    """
+    ask_myconfigura_login_msg()
+    email = input(prompt_text("Email    : ")).strip()
+    print(prompt_text("Password : "), end="", flush=True)
+    password = getpass.getpass(prompt="")
+    if not email or not password:
+        show_input_error_msg("Email and password are required.")
+        return get_myconfigura_login()
+
+    return email, password
+
+def get_login_retry_confirmation() -> bool:
+    """Asks whether to try the MyConfigura login again after it failed."""
+    user_input = input(prompt_text("Login failed. Try again with another email/password? [y/n]: "))
+    user_input = user_input.lower().strip()
+    if user_input == "y" or user_input == "yes":
+        return True
+    elif user_input == "n" or user_input == "no":
+        return False
+
+    show_input_error_msg("Incorrect input.")
+    return get_login_retry_confirmation()
 
 # Test
 def get_test_branch_input(test_branch_list: list[str]) ->str:

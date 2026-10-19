@@ -91,6 +91,19 @@ def show_progress(title: str, elapsed_seconds: float, percent: int | None, statu
 def clear_progress():
     print(f"\r{CLEAR_LINE}", end="", flush=True)
 
+def show_waiting_prompt(title: str, question: str):
+    """
+    Shows a question the running command is waiting on.
+    The cursor stays after the question, so the answer can be typed there.
+    """
+    clear_progress()
+    print(f"  {YELLOW}{BOLD}! {title} is waiting for an answer. Type it and press Enter.{RESET}")
+    print(f"  {YELLOW}{BOLD}?{RESET} {BOLD}{question}{RESET} ", end="", flush=True)
+
+def end_waiting_prompt():
+    """Moves below the answered question, so the progress line does not draw over it."""
+    print()
+
 def show_error_header(line: str):
     clear_progress()
     print(f"\n    {RED}{BOLD}{line}{RESET}")

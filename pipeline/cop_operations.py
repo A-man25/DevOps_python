@@ -21,7 +21,44 @@
 #
 # ============================================================
 
+import os
+
 from pipeline.command_runner import run_command_live
+
+# cop login exits with code 0 even when the login fails,
+# so this text is the only sign that it worked
+COP_LOGIN_SUCCESS_TEXT = "Successfully logged in to MyConfigura"
+
+def is_cop_login_set() -> bool:
+    """Checks if the MyConfigura login is already set for COP."""
+    return bool(os.environ.get("CETDEV_MC_USERNAME")) and bool(os.environ.get("CETDEV_MC_PASSWORD"))
+
+def set_cop_login(email: str, password: str):
+    """
+    Gives COP the MyConfigura login through environment variables.
+    COP reads them whenever it needs to log in (cop upload does),
+    so it never has to ask.
+    Only set for this run, nothing is saved to disk.
+    """
+    os.environ["CETDEV_MC_USERNAME"] = email
+    os.environ["CETDEV_MC_PASSWORD"] = password
+
+def clear_cop_login():
+    """Forgets the MyConfigura login for this run, e.g. after a wrong password."""
+    os.environ.pop("CETDEV_MC_USERNAME", None)
+    os.environ.pop("CETDEV_MC_PASSWORD", None)
+
+def cop_login(repo_path: str) -> bool:
+    """
+    Logs in to MyConfigura with the login set by set_cop_login,
+    so a wrong email or password is found before the build starts.
+
+    COP's exit code is 0 even when the login fails, so the login
+    only counts as done when COP prints COP_LOGIN_SUCCESS_TEXT.
+    """
+    cop_command = ["cop", "login"]
+    email = os.environ.get("CETDEV_MC_USERNAME", "")
+    return run_command_live(cop_command, repo_path, "COP LOGIN", email, COP_LOGIN_SUCCESS_TEXT)
 
 def cop_clean(repo_path: str) -> bool:
     """Runs 'cop clean' in the specified build workspace."""
