@@ -29,6 +29,14 @@ FAKE_COMMANDS = {
     "ok.py": 'print("hello from the fake command")',
     "fail.py": 'import sys\nprint("something went wrong")\nsys.exit(1)',
     "no_files.py": 'print("No files to upload! Please make sure the built extension versions match.")',
+    # The real output of 'cop upload ... /verbose' for an account without upload rights (21 Oct 2026)
+    "upload_no_rights.py": (
+        'print("Successfully logged in to MyConfigura.")\n'
+        'print("done.")\n'
+        'print("MyConfigura returned 0 extensions able to be uploaded")\n'
+        'print("Collecting directories and files to upload...")\n'
+        'print("No files to upload! Please make sure the built extension versions match.")'
+    ),
     "login_ok.py": 'print("Logging in to MyConfigura using e-mail: t@example.com")\nprint("Successfully logged in to MyConfigura.")',
     "login_fail.py": 'print("Logging in to MyConfigura using e-mail: t@example.com")\nprint("Failed to log in to MyConfigura.")',
     "make_fail.py": (
@@ -98,6 +106,15 @@ class CommandRunnerTests(QuietTestCase):
     def test_failure_message_with_exit_code_zero(self):
         self.assertFalse(self.run_fake("no_files.py"))
         self.assertIn("No files to upload", self.screen_text())
+
+    def test_upload_without_rights_shows_the_real_reason(self):
+        self.assertFalse(self.run_fake("upload_no_rights.py", title="COP UPLOAD"))
+        screen = self.screen_text()
+        # The first (real) reason is on the [FAIL] line, not COP's general message after it
+        self.assertIn("COP UPLOAD", screen)
+        fail_line = [line for line in screen.splitlines() if "[FAIL]" in line][0]
+        self.assertIn("MyConfigura returned 0 extensions able to be uploaded", fail_line)
+        self.assertIn("not allowed to upload these extensions", screen)
 
     def test_required_text_present(self):
         self.assertTrue(self.run_fake("login_ok.py", required_text="Successfully logged in to MyConfigura"))

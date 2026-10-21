@@ -133,6 +133,10 @@ def get_cop_make_errors(extension_groups: list[str], repo_path: str) -> list[str
 
 
 def cop_upload(extension_groups: list[str], upload_name: str, repo_path: str) -> bool:
-    """Uploads the selected HNI extension builds."""
-    cop_command = ["cop", "upload", *extension_groups, f"/uploadname={upload_name}"]
+    """
+    Uploads the selected HNI extension builds.
+    /verbose makes COP say how many extensions MyConfigura lets this
+    account upload, so a missing upload right shows up clearly.
+    """
+    cop_command = ["cop", "upload", *extension_groups, f"/uploadname={upload_name}", "/verbose"]
     return run_command_live(cop_command, repo_path, "COP UPLOAD", upload_name)

@@ -50,7 +50,7 @@ class CopCommandTests(QuietTestCase):
         cop_operations.cop_make(["[hbf]"], "C:\\repo")
         cop_operations.cop_upload(["[hbf]"], "17-5-0-27@BETA", "C:\\repo")
         self.assertEqual(self.calls[0]["command"], ["cop", "make", "[hbf]"])
-        self.assertEqual(self.calls[1]["command"], ["cop", "upload", "[hbf]", "/uploadname=17-5-0-27@BETA"])
+        self.assertEqual(self.calls[1]["command"], ["cop", "upload", "[hbf]", "/uploadname=17-5-0-27@BETA", "/verbose"])
 
     def test_login_needs_coPs_success_message(self):
         cop_operations.cop_login("C:\\repo")

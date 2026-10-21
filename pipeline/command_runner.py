@@ -63,8 +63,11 @@ TARGET_PATTERN = re.compile(r"^(\d+)\)\s+(\S+)\s*(.*)$")
 RESULT_PATTERN = re.compile(r"^\*\s+(\w+)\s+(\S+)\s*(.*)$")
 FAILED_STATUS_LIST = ["error", "errors", "failed"]
 
-# COP prints these when a command fails but still exits with code 0
+# COP prints these when a command fails but still exits with code 0.
+# The first one found is reported, because COP prints the real reason
+# first and a general message after it.
 FAILURE_TEXT_LIST = [
+    "MyConfigura returned 0 extensions able to be uploaded",
     "No files to upload",
     "Upload finished with errors",
     "Upload completed with errors",
@@ -81,6 +84,15 @@ FAILURE_TEXT_LIST = [
 # "===== Work completed in 00:21:03: 36 item(s), 35 succeeded, 0 with warnings, 1 failed, 0 skipped or cancelled ====="
 SUMMARY_COUNTS_PATTERN = re.compile(r"\d+ item\(s\).*")
 FAILED_COUNT_PATTERN = re.compile(r"(\d+) failed")
+
+# Extra help shown when a command fails with one of the texts above
+FAILURE_HINTS = {
+    "MyConfigura returned 0 extensions able to be uploaded":
+        "Your MyConfigura account is not allowed to upload these extensions. "
+        "Ask the Build Center admin to give it upload rights, or save the login of an account that has them.",
+    "No files to upload":
+        "The built files were not found for the versions in extension.xml. The full output in the log has the details.",
+}
 
 # COP prints this when it needs a MyConfigura login it cannot ask for
 LOGIN_NEEDED_TEXT = "Login via console is not available"
@@ -269,7 +281,7 @@ def run_command_live(command: list[str], cwd: str, title: str, detail: str = "",
                         login_needed = True
 
                     for this_text in FAILURE_TEXT_LIST:
-                        if this_text in line:
+                        if this_text in line and not failure_text:
                             failure_text = this_text
 
                     if line.startswith("Log file path:") or line.startswith("Log file is available here:"):
@@ -363,7 +375,7 @@ def run_command_live(command: list[str], cwd: str, title: str, detail: str = "",
 
     show_result(title, elapsed_seconds, success, detail)
     if not success:
-        hint = ""
+        hint = FAILURE_HINTS.get(failure_text, "")
         if login_needed:
             hint = LOGIN_HINT
         show_failure_details(failed_targets, target_logs, list(recent_lines), cop_log_path, output_log_path, hint)
