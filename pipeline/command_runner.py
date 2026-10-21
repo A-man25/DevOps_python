@@ -136,10 +136,28 @@ def read_output(process: subprocess.Popen, output_queue: queue.Queue, waiting_te
     if partial_line:
         output_queue.put(partial_line)
 
+    # The output has ended: this thread was the only one reading it
+    process.stdout.close()
+
 def stop_process(process: subprocess.Popen):
     """Stops a running command (used on Ctrl+C), so it does not keep running in the background."""
     if process.poll() is None:
         process.kill()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            pass
+
+def close_output(process: subprocess.Popen, reader_thread: threading.Thread):
+    """
+    Closes the command's output pipe once the reader thread is done with it.
+    If a helper process (like a COP build worker) still holds the pipe open,
+    the reader is still waiting on it: then it is left open, because closing
+    it now would block the tool.
+    """
+    reader_thread.join(timeout=0.5)
+    if not reader_thread.is_alive():
+        process.stdout.close()
 
 def run_command_live(command: list[str], cwd: str, title: str, detail: str = "", required_text: str = "") -> bool:
     """
@@ -285,11 +303,14 @@ def run_command_live(command: list[str], cwd: str, title: str, detail: str = "",
                     else:
                         status = line
 
-                # The command has exited, but processes it started (like COP's
-                # build workers) can keep its output open. Stop once nothing
-                # new arrives for 1 second.
-                if process.poll() is not None and time.monotonic() - last_output_time >= 1:
-                    break
+                # The command has exited. Usually its output has ended too, so
+                # stop straight away. But processes it started (like COP's build
+                # workers) can keep the output open: then stop once nothing new
+                # has arrived for 1 second.
+                if process.poll() is not None:
+                    output_ended = not reader_thread.is_alive() and output_queue.empty()
+                    if output_ended or time.monotonic() - last_output_time >= 1:
+                        break
 
                 # The command is waiting for an answer (e.g. "Password: ").
                 # Stop the animation and show the question, so it can be answered.
@@ -315,11 +336,13 @@ def run_command_live(command: list[str], cwd: str, title: str, detail: str = "",
         except KeyboardInterrupt:
             # Ctrl+C: stop the command as well, so it does not keep running
             stop_process(process)
+            close_output(process, reader_thread)
             clear_progress()
             output_log.write("  <- stopped with Ctrl+C\n")
             show_result(title, time.monotonic() - start_time, False, "stopped with Ctrl+C")
             raise
 
+    close_output(process, reader_thread)
     elapsed_seconds = time.monotonic() - start_time
 
     failed_match = FAILED_COUNT_PATTERN.search(summary)

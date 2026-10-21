@@ -77,9 +77,16 @@ def show_progress(title: str, elapsed_seconds: float, percent: int | None, statu
     else:
         percent_text = "    "
 
-    # Cut the status so the line never wraps onto a second line
+    # A line wider than the window wraps onto a second line, and then every
+    # redraw adds a new line. In a narrow window, use a short line without
+    # the bar; in a normal window, cut the status to fit.
     used_width = len(f"  {spinner}  {title:<{TITLE_WIDTH}} [{bar}] {percent_text}  {elapsed}  ")
-    status = status[:max(0, width - used_width)]
+    if used_width > width:
+        short_line = f"  {spinner} {title} {percent_text.strip()} {elapsed} {status}"
+        print(f"\r{short_line[:max(0, width)]}{CLEAR_LINE}", end="", flush=True)
+        return
+
+    status = status[:width - used_width]
 
     print(
         f"\r  {CYAN}{spinner}{RESET}  {BOLD}{title:<{TITLE_WIDTH}}{RESET} "

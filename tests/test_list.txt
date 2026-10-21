@@ -1,0 +1,156 @@
+PYTHON TEST COVERAGE
+====================
+
+This document lists the test files, number of tests, and the Python modules/features covered by each test suite.
+
+
+1. test_versioning.py
+---------------------
+Tests: 8
+
+Covers:
+- pipeline/versioning.py
+
+
+2. test_branch_parsing.py
+-------------------------
+Tests: 13
+
+Covers:
+- Branch parsing logic in pipeline/git_operations.py
+- Version parsing logic in pipeline/git_operations.py
+
+
+3. test_input_parsing.py
+------------------------
+Tests: 9
+
+Covers:
+- ui/input_handler.py
+- config/extension_config.py
+- models/enums.py
+
+
+4. test_command_runner.py
+-------------------------
+Tests: 13
+
+Covers:
+- pipeline/command_runner.py
+- Command exit codes
+- Failures where the command returns exit code 0
+- `cop make` output parsing
+- Carriage return (`\r`) line handling
+- Interactive command questions/prompts
+- Missing program handling
+- Ctrl+C / KeyboardInterrupt handling
+- Build worker handling
+
+
+5. test_git_operations.py
+-------------------------
+Tests: 19
+
+Covers:
+- Remaining functionality in pipeline/git_operations.py
+- Real Git repository operations
+
+
+6. test_preflight.py
+--------------------
+Tests: 8
+
+Covers:
+- workflow/preflight.py
+- Every preflight check
+- Passing scenarios
+- Failing scenarios
+
+
+7. test_beta_build_flow.py
+--------------------------
+Tests: 11
+
+Covers:
+- workflow/beta_build_flow.py
+- Successful beta build flow
+- Failed build handling
+- Both cancellation paths
+- Version already taken
+- Push failures and retries
+- Upload failures and retries
+- Leftover commit handling
+- Version already set handling
+
+
+8. test_release_flow.py
+-----------------------
+Tests: 7
+
+Covers:
+- workflow/release_flow.py
+
+
+9. test_login.py
+----------------
+Tests: 13
+
+Covers:
+- Login flow
+- `cop login`
+- Password is never displayed
+- Password is never logged
+- utils/credential_store.py
+
+
+10. test_cop_operations.py
+--------------------------
+Tests: 7
+
+Covers:
+- Exact COP commands
+- Compile-error reader
+- COP operation handling
+
+
+11. test_ui.py
+--------------
+Tests: 13
+
+Covers:
+- ui/progress.py
+- ui/display.py
+- ui/colours.py
+
+
+12. test_main.py
+----------------
+Tests: 9
+
+Covers:
+- main.py
+- config/workspace_config.py
+- config/dev_config.py
+
+
+SUMMARY
+=======
+
+Total Test Files : 12
+Total Tests      : 130
+
+Coverage Areas:
+- Versioning
+- Git operations
+- Branch and version parsing
+- User input handling
+- Extension configuration
+- Command execution
+- COP build operations
+- Preflight validation
+- Beta build workflow
+- Release workflow
+- Authentication and credential handling
+- Terminal/UI output
+- Application entry point
+- Workspace and development configuration
