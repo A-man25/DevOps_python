@@ -14,6 +14,7 @@ from .display import (
     ask_extension_list_msg,
     ask_branch_info_msg,
     ask_myconfigura_login_msg,
+    ask_remember_login_msg,
     prompt_text,
     show_input_error_msg,
 
@@ -126,8 +127,8 @@ def get_git_changes_confirmation() -> bool:
     return get_git_changes_confirmation()
 
 def get_git_changes_push_confirmation() -> bool:
-    """Confirms whether the displayed Git changes are safe to push."""
-    user_input = input(prompt_text("Are these changes correct and safe to push? [y/n]: "))
+    """Confirms, after a successful build, that the version may be committed, tagged and pushed."""
+    user_input = input(prompt_text("The build worked. Commit, tag and push this version? [y/n]: "))
     user_input = user_input.lower().strip()
     if user_input == "y" or user_input == "yes":
         return True
@@ -150,6 +151,31 @@ def get_myconfigura_login() -> tuple[str, str]:
         return get_myconfigura_login()
 
     return email, password
+
+def get_remember_login_confirmation() -> bool:
+    """Asks whether to save the MyConfigura login on this PC."""
+    ask_remember_login_msg()
+    user_input = input(prompt_text("Remember this login on this PC? [y/n]: "))
+    user_input = user_input.lower().strip()
+    if user_input == "y" or user_input == "yes":
+        return True
+    elif user_input == "n" or user_input == "no":
+        return False
+
+    show_input_error_msg("Incorrect input.")
+    return get_remember_login_confirmation()
+
+def get_retry_confirmation(step_name: str) -> bool:
+    """Asks whether to try a failed step again (e.g. after a network problem)."""
+    user_input = input(prompt_text(f"{step_name} failed. Try again? [y/n]: "))
+    user_input = user_input.lower().strip()
+    if user_input == "y" or user_input == "yes":
+        return True
+    elif user_input == "n" or user_input == "no":
+        return False
+
+    show_input_error_msg("Incorrect input.")
+    return get_retry_confirmation(step_name)
 
 def get_login_retry_confirmation() -> bool:
     """Asks whether to try the MyConfigura login again after it failed."""

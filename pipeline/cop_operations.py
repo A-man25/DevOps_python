@@ -22,8 +22,17 @@
 # ============================================================
 
 import os
+import subprocess
 
-from pipeline.command_runner import run_command_live
+from pipeline.command_runner import (
+    run_command_live,
+    TARGET_PATTERN
+)
+
+from ui.progress import (
+    show_reading_errors_msg,
+    show_compile_errors
+)
 
 # cop login exits with code 0 even when the login fails,
 # so this text is the only sign that it worked
@@ -85,9 +94,42 @@ def cop_set_versions(extension_groups: list[str], build_version: str, repo_path:
 
 
 def cop_make(extension_groups: list[str], repo_path: str) -> bool:
-    """Builds the selected HNI extension groups."""
+    """
+    Builds the selected HNI extension groups.
+    If the build fails, the compile errors are shown on screen.
+    """
     cop_command = ["cop", "make", *extension_groups]
-    return run_command_live(cop_command, repo_path, "COP MAKE")
+    if run_command_live(cop_command, repo_path, "COP MAKE"):
+        return True
+
+    show_reading_errors_msg()
+    show_compile_errors(get_cop_make_errors(extension_groups, repo_path))
+    return False
+
+
+def get_cop_make_errors(extension_groups: list[str], repo_path: str) -> list[str]:
+    """
+    Returns the errors of the last cop make, using COP's own
+    /printLastErrorsCompact. It only prints, it does not build again.
+    COP's heading and target list are left out.
+    """
+    cop_command = ["cop", "make", *extension_groups, "/printLastErrorsCompact"]
+    try:
+        result = subprocess.run(cop_command, cwd=repo_path, capture_output=True, text=True,
+                                errors="replace", timeout=300)
+    except (OSError, subprocess.TimeoutExpired):
+        return ["Could not read the errors from COP. Open the failed target's build log above."]
+
+    error_lines = []
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if not line or TARGET_PATTERN.match(line):
+            continue
+        if line.startswith("cop make (using") or line.startswith("Collecting items") or line.startswith("COP make targets"):
+            continue
+        error_lines.append(line)
+
+    return error_lines
 
 
 def cop_upload(extension_groups: list[str], upload_name: str, repo_path: str) -> bool:

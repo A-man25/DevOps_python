@@ -21,11 +21,17 @@
 # ============================================================
 
 def get_release_build_tags(tags : list[str], release_version : str) -> list[str]:
+    """
+    Returns the tags that are exactly <release_version>.<number>, e.g. 16.5.9.11.
+    Other tags with the same start (e.g. 16.5.9.11-test) are ignored,
+    so they cannot crash the tool or confuse the build number.
+    """
     release_tags = []
     prefix = release_version + "."
     for tag in tags:
         tag = tag.strip()
-        if tag.startswith(prefix):
+        build_number = tag.removeprefix(prefix)
+        if tag.startswith(prefix) and build_number.isdigit():
             release_tags.append(tag)
 
     return release_tags

@@ -91,6 +91,12 @@ def show_progress(title: str, elapsed_seconds: float, percent: int | None, statu
 def clear_progress():
     print(f"\r{CLEAR_LINE}", end="", flush=True)
 
+def show_idle_hint(title: str, minutes: int):
+    """Shown once when a command has printed nothing for a long time."""
+    clear_progress()
+    print(f"  {YELLOW}! {title} has printed nothing for {minutes} minutes. It may still be working.{RESET}")
+    print(f"  {YELLOW}  If it looks stuck, press Ctrl+C to stop it (the full output is in the log).{RESET}")
+
 def show_waiting_prompt(title: str, question: str):
     """
     Shows a question the running command is waiting on.
@@ -131,6 +137,22 @@ def show_result(title: str, elapsed_seconds: float, success: bool, detail: str):
         badge = f"{RED}{BOLD}[FAIL]{RESET}"
 
     print(f"  {badge}  {BOLD}{title:<{TITLE_WIDTH}}{RESET} {DIM}{format_elapsed_time(elapsed_seconds)}{RESET}  {detail}")
+
+def show_reading_errors_msg():
+    print(f"\n    {DIM}Reading the compile errors from the last build...{RESET}")
+
+def show_compile_errors(error_lines: list[str], max_lines: int = 40):
+    """Shows the compile errors COP saved for the failed targets."""
+    if not error_lines:
+        print(f"    {YELLOW}COP gave no error details. Open the failed target's build log above.{RESET}")
+        return
+
+    print(f"\n    {RED}{BOLD}Compile errors:{RESET}")
+    for line in error_lines[:max_lines]:
+        print(f"    {YELLOW}{line}{RESET}")
+
+    if len(error_lines) > max_lines:
+        print(f"    {DIM}... {len(error_lines) - max_lines} more line(s) in the failed target's build log{RESET}")
 
 def show_failure_details(failed_targets: list[str], target_logs: dict[str, str], recent_lines: list[str], cop_log_path: str, output_log_path: str, hint: str):
     """Shows what failed, the last lines printed and where to find the full logs."""

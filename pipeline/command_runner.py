@@ -14,6 +14,7 @@
 # - Print errors and warnings in full
 # - Save the full output to the log folder (one file per day)
 # - Report command success or failure
+# - Stop the command cleanly on Ctrl+C
 #
 # ============================================================
 
@@ -31,6 +32,8 @@ from ui.progress import (
     can_animate,
     show_command,
     show_progress,
+    clear_progress,
+    show_idle_hint,
     show_waiting_prompt,
     end_waiting_prompt,
     show_error_header,
@@ -91,6 +94,22 @@ FRAME_SECONDS = 0.1
 RECENT_LINE_COUNT = 15
 MAX_ERROR_LINES = 40
 
+# After this long without any output, a hint explains how to stop the command
+IDLE_HINT_SECONDS = 600
+
+def get_log_path() -> str:
+    """Today's log file: log/build_YYYYMMDD.log"""
+    os.makedirs(LOG_FOLDER, exist_ok=True)
+    return os.path.join(LOG_FOLDER, f"build_{datetime.now():%Y%m%d}.log")
+
+def write_to_log(text: str) -> str:
+    """Adds text to today's log file and returns the log file path."""
+    log_path = get_log_path()
+    with open(log_path, "a", encoding="utf-8") as output_log:
+        output_log.write(f"\n===== {datetime.now():%H:%M:%S} =====\n{text}\n")
+
+    return log_path
+
 def read_output(process: subprocess.Popen, output_queue: queue.Queue, waiting_text: dict):
     """
     Reads command output and passes it to the main thread line by line.
@@ -117,6 +136,11 @@ def read_output(process: subprocess.Popen, output_queue: queue.Queue, waiting_te
     if partial_line:
         output_queue.put(partial_line)
 
+def stop_process(process: subprocess.Popen):
+    """Stops a running command (used on Ctrl+C), so it does not keep running in the background."""
+    if process.poll() is None:
+        process.kill()
+
 def run_command_live(command: list[str], cwd: str, title: str, detail: str = "", required_text: str = "") -> bool:
     """
     Runs a COP or Git command and shows one animated progress
@@ -132,13 +156,17 @@ def run_command_live(command: list[str], cwd: str, title: str, detail: str = "",
     when it prints this text (for commands whose exit code cannot
     be trusted, like cop login).
     Returns True if the command succeeds.
+    Ctrl+C stops the command too, then stops the tool.
     """
     show_command(command)
+    output_log_path = get_log_path()
 
-    os.makedirs(LOG_FOLDER, exist_ok=True)
-    output_log_path = os.path.join(LOG_FOLDER, f"build_{datetime.now():%Y%m%d}.log")
-
-    process = subprocess.Popen(command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    # The program may be missing (not installed / not on PATH) or the folder may not exist
+    try:
+        process = subprocess.Popen(command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    except OSError as error:
+        show_result(title, 0, False, f"could not start {command[0]}: {error.strerror or error}")
+        return False
 
     # Output is read on a separate thread so the animation
     # keeps moving while the command is quiet
@@ -162,8 +190,10 @@ def run_command_live(command: list[str], cwd: str, title: str, detail: str = "",
     recent_lines = deque(maxlen=RECENT_LINE_COUNT)
     in_error_section = False
     error_line_count = 0
-    login_needed = True
+    # Becomes True only when COP says it cannot log in (LOGIN_NEEDED_TEXT)
+    login_needed = False
     prompt_shown = False
+    idle_hint_shown = False
     required_text_seen = not required_text
 
     # buffering=1 writes every line straight away, so the log is
@@ -171,110 +201,124 @@ def run_command_live(command: list[str], cwd: str, title: str, detail: str = "",
     with open(output_log_path, "a", encoding="utf-8", buffering=1) as output_log:
         output_log.write(f"\n===== {datetime.now():%H:%M:%S}  {' '.join(command)} =====\n")
 
-        while True:
-            # Handle every line printed since the last frame
-            while not output_queue.empty():
-                line = output_queue.get()
-                last_output_time = time.monotonic()
-                output_log.write(line + "\n")
+        try:
+            while True:
+                # Handle every line printed since the last frame
+                while not output_queue.empty():
+                    line = output_queue.get()
+                    last_output_time = time.monotonic()
+                    output_log.write(line + "\n")
 
-                # The question was answered: carry on below it
-                if prompt_shown:
-                    end_waiting_prompt()
-                    prompt_shown = False
+                    # The question was answered: carry on below it
+                    if prompt_shown:
+                        end_waiting_prompt()
+                        prompt_shown = False
 
-                line = ANSI_CODE_PATTERN.sub("", line).strip()
-                if not line:
-                    continue
+                    line = ANSI_CODE_PATTERN.sub("", line).strip()
+                    if not line:
+                        continue
 
-                if COP_PROGRESS_TEXT in line:
-                    percent_match = PERCENT_PATTERN.search(line)
-                    if percent_match:
-                        percent = min(int(percent_match.group(1)), 100)
+                    if COP_PROGRESS_TEXT in line:
+                        percent_match = PERCENT_PATTERN.search(line)
+                        if percent_match:
+                            percent = min(int(percent_match.group(1)), 100)
 
-                    # Text after the "|" is what COP is working on
-                    if "|" in line:
-                        status = line.split("|", 1)[1].strip()
-                    continue
+                        # Text after the "|" is what COP is working on
+                        if "|" in line:
+                            status = line.split("|", 1)[1].strip()
+                        continue
 
-                git_progress_match = GIT_PROGRESS_PATTERN.search(line)
-                if git_progress_match:
-                    status = git_progress_match.group(1).strip()
-                    percent = min(int(git_progress_match.group(2)), 100)
-                    continue
+                    git_progress_match = GIT_PROGRESS_PATTERN.search(line)
+                    if git_progress_match:
+                        status = git_progress_match.group(1).strip()
+                        percent = min(int(git_progress_match.group(2)), 100)
+                        continue
 
-                # Remember each target's build log, but keep the long path off the screen
-                target_match = TARGET_PATTERN.match(line)
-                if target_match:
-                    target_logs[target_match.group(2)] = target_match.group(3)
-                    status = f"Found {len(target_logs)} target(s)"
-                    continue
+                    # Remember each target's build log, but keep the long path off the screen
+                    target_match = TARGET_PATTERN.match(line)
+                    if target_match:
+                        target_logs[target_match.group(2)] = target_match.group(3)
+                        status = f"Found {len(target_logs)} target(s)"
+                        continue
 
-                recent_lines.append(line)
-                result_match = RESULT_PATTERN.match(line)
+                    recent_lines.append(line)
+                    result_match = RESULT_PATTERN.match(line)
 
-                if required_text and required_text in line:
-                    required_text_seen = True
+                    if required_text and required_text in line:
+                        required_text_seen = True
 
-                if LOGIN_NEEDED_TEXT in line:
-                    login_needed = True
+                    if LOGIN_NEEDED_TEXT in line:
+                        login_needed = True
 
-                for this_text in FAILURE_TEXT_LIST:
-                    if this_text in line:
-                        failure_text = this_text
+                    for this_text in FAILURE_TEXT_LIST:
+                        if this_text in line:
+                            failure_text = this_text
 
-                if line.startswith("Log file path:") or line.startswith("Log file is available here:"):
-                    cop_log_path = line.split(":", 1)[1].strip()
-                elif "Work completed" in line:
-                    summary = line.strip("= ")
-                    in_error_section = False
-                elif result_match and result_match.group(2) in target_logs:
-                    # A COP make target has finished: move the bar
-                    result_status, target, result_details = result_match.groups()
-                    finished_targets.append(target)
-                    percent = len(finished_targets) * 100 // len(target_logs)
-                    status = f"{len(finished_targets)}/{len(target_logs)} done · {target}"
+                    if line.startswith("Log file path:") or line.startswith("Log file is available here:"):
+                        cop_log_path = line.split(":", 1)[1].strip()
+                    elif "Work completed" in line:
+                        summary = line.strip("= ")
+                        in_error_section = False
+                    elif result_match and result_match.group(2) in target_logs:
+                        # A COP make target has finished: move the bar
+                        result_status, target, result_details = result_match.groups()
+                        finished_targets.append(target)
+                        percent = len(finished_targets) * 100 // len(target_logs)
+                        status = f"{len(finished_targets)}/{len(target_logs)} done · {target}"
 
-                    target_failed = result_status.lower() in FAILED_STATUS_LIST
-                    if target_failed:
-                        failed_targets.append(target)
+                        target_failed = result_status.lower() in FAILED_STATUS_LIST
+                        if target_failed:
+                            failed_targets.append(target)
 
-                    # Only targets with errors or warnings stay on screen
-                    if target_failed or result_status.lower().startswith("warn"):
-                        show_target_result(result_status, target, result_details, target_failed)
-                elif "ERRORS / WARNINGS DURING BUILD" in line:
-                    in_error_section = True
-                    show_error_header(line)
-                elif in_error_section:
-                    error_line_count += 1
-                    if error_line_count <= MAX_ERROR_LINES:
-                        show_error_line(line)
-                    elif error_line_count == MAX_ERROR_LINES + 1:
-                        show_error_line("... more errors in the full output log")
-                else:
-                    status = line
+                        # Only targets with errors or warnings stay on screen
+                        if target_failed or result_status.lower().startswith("warn"):
+                            show_target_result(result_status, target, result_details, target_failed)
+                    elif "ERRORS / WARNINGS DURING BUILD" in line:
+                        in_error_section = True
+                        show_error_header(line)
+                    elif in_error_section:
+                        error_line_count += 1
+                        if error_line_count <= MAX_ERROR_LINES:
+                            show_error_line(line)
+                        elif error_line_count == MAX_ERROR_LINES + 1:
+                            show_error_line("... more errors in the full output log")
+                    else:
+                        status = line
 
-            # The command has exited, but processes it started (like COP's
-            # build workers) can keep its output open. Stop once nothing
-            # new arrives for 1 second.
-            if process.poll() is not None and time.monotonic() - last_output_time >= 1:
-                break
+                # The command has exited, but processes it started (like COP's
+                # build workers) can keep its output open. Stop once nothing
+                # new arrives for 1 second.
+                if process.poll() is not None and time.monotonic() - last_output_time >= 1:
+                    break
 
-            # The command is waiting for an answer (e.g. "Password: ").
-            # Stop the animation and show the question, so it can be answered.
-            question = waiting_text["text"].strip()
-            quiet_seconds = time.monotonic() - last_output_time
-            if (not prompt_shown and question and quiet_seconds >= PROMPT_WAIT_SECONDS
-                    and PROMPT_PATTERN.search(question)):
-                output_log.write(question + "  <- waiting for an answer\n")
-                show_waiting_prompt(title, question)
-                prompt_shown = True
+                # The command is waiting for an answer (e.g. "Password: ").
+                # Stop the animation and show the question, so it can be answered.
+                question = waiting_text["text"].strip()
+                quiet_seconds = time.monotonic() - last_output_time
+                if (not prompt_shown and question and quiet_seconds >= PROMPT_WAIT_SECONDS
+                        and PROMPT_PATTERN.search(question)):
+                    output_log.write(question + "  <- waiting for an answer\n")
+                    show_waiting_prompt(title, question)
+                    prompt_shown = True
 
-            if animate and not prompt_shown:
-                show_progress(title, time.monotonic() - start_time, percent, status, frame)
+                # Quiet for a very long time: say so once, and how to stop it
+                if not idle_hint_shown and not prompt_shown and quiet_seconds >= IDLE_HINT_SECONDS:
+                    show_idle_hint(title, int(quiet_seconds // 60))
+                    idle_hint_shown = True
 
-            frame += 1
-            time.sleep(FRAME_SECONDS)
+                if animate and not prompt_shown:
+                    show_progress(title, time.monotonic() - start_time, percent, status, frame)
+
+                frame += 1
+                time.sleep(FRAME_SECONDS)
+
+        except KeyboardInterrupt:
+            # Ctrl+C: stop the command as well, so it does not keep running
+            stop_process(process)
+            clear_progress()
+            output_log.write("  <- stopped with Ctrl+C\n")
+            show_result(title, time.monotonic() - start_time, False, "stopped with Ctrl+C")
+            raise
 
     elapsed_seconds = time.monotonic() - start_time
 

@@ -90,14 +90,55 @@ def ask_branch_info_msg():
     show_menu_option("c", "Custom")
 
 def ask_myconfigura_login_msg():
-    print(f"    {DIM}COP needs this to upload. Asked once per build, never saved.{RESET}")
+    print(f"    {DIM}COP needs this to upload. After it works, you can save it on this PC.{RESET}")
 
-def show_build_summary(build_type,extension_list,release_branch: str,release_version: str,next_build_version: str):
+def ask_remember_login_msg():
+    print(f"\n    {DIM}Saved in Windows Credential Manager, encrypted, only for your Windows user on this PC.{RESET}")
+    print(f"    {DIM}Do not save it if other people use this Windows account.{RESET}")
+
+def show_saved_login_msg(email: str):
+    print(f"    {DIM}Using the login saved on this PC:{RESET} {BOLD}{email}{RESET}")
+
+def show_login_saved_msg(saved: bool):
+    if saved:
+        print(f"    {GREEN}Login saved. It will be used next time.{RESET}")
+    else:
+        print(f"    {YELLOW}! Could not save the login. It will be asked next time.{RESET}")
+
+def show_saved_login_removed_msg():
+    print(f"  {YELLOW}! The saved login did not work (changed password?), so it was removed from this PC.{RESET}")
+
+def show_preflight_header():
+    show_section("CHECKING THIS PC")
+
+def show_check(name: str, passed: bool, detail: str = ""):
+    """One pre-flight check line, e.g. [ OK ]  Git installed   C:\\...\\git.exe"""
+    if passed:
+        print(f"  {GREEN}{BOLD}[ OK ]{RESET}  {name:<24} {DIM}{detail}{RESET}")
+    else:
+        print(f"  {RED}{BOLD}[FAIL]{RESET}  {name:<24} {RED}{detail}{RESET}")
+
+def show_check_details(lines: list[str]):
+    """Extra lines under a failed check, e.g. the uncommitted files."""
+    for line in lines:
+        print(f"            {DIM}{line}{RESET}")
+
+def show_connecting_msg():
+    show_section("LATEST BRANCHES AND BUILD NUMBERS")
+
+def show_version_free_msg(build_version: str):
+    print(f"    {GREEN}{build_version} is still free on the server.{RESET}")
+
+def show_error_details_msg(log_path: str):
+    print(f"    {DIM}The details were saved to: {log_path}{RESET}")
+
+def show_build_summary(build_type,extension_list,release_branch: str,release_version: str,last_build_version: str,next_build_version: str):
     show_section("BUILD SUMMARY")
     show_value("Build Type", build_type.name)
     show_value("Extensions", ", ".join(extension.name for extension in extension_list))
     show_value("Release Branch", release_branch)
     show_value("Release Version", release_version)
+    show_value("Last Build", last_build_version)
     show_value("Next Version", next_build_version, GREEN + BOLD)
     show_end_line()
 
@@ -106,10 +147,19 @@ def show_step(step: int, total_steps: int, name: str):
     show_section(f"STEP {step}/{total_steps} · {name}")
 
 def show_changed_files(changed_files: list[str]):
-    """Shows 'git status --short' output with a colour per change type."""
+    """
+    Shows 'git status --short' output with a colour per change type.
+    New files (??) are not committed (see stage_files), so they are dimmed.
+    """
+    commit_count = 0
     for changed_file in changed_files:
         change_type = changed_file[:2]
         file_path = changed_file[3:]
+        if change_type == "??":
+            print(f"    {DIM}??  {file_path}   (new file, will NOT be committed){RESET}")
+            continue
+
+        commit_count += 1
         if "D" in change_type:
             colour = RED
         elif "M" in change_type:
@@ -119,7 +169,7 @@ def show_changed_files(changed_files: list[str]):
 
         print(f"    {colour}{BOLD}{change_type}{RESET}  {file_path}")
 
-    print(f"    {DIM}{len(changed_files)} file(s) changed{RESET}")
+    print(f"    {DIM}{commit_count} file(s) will be committed{RESET}")
 
 def show_build_stopped(reason: str):
     show_box("BETA BUILD STOPPED", RED)
